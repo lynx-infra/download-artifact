@@ -31426,19 +31426,82 @@ exports.DefaultArtifactClient = DefaultArtifactClient;
 /***/ }),
 
 /***/ 78057:
-/***/ ((__unused_webpack_module, exports) => {
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.defaultObjectKeyPrefix = exports.secretkey = exports.accesskey = exports.region = exports.endpoint = exports.runId = exports.repoName = exports.bucketName = void 0;
-exports.bucketName = process.env['BUCKET_NAME'];
+const fs_1 = __nccwpck_require__(57147);
+const path_1 = __nccwpck_require__(71017);
+const core = __importStar(__nccwpck_require__(20802));
+const credentialsPath = process.env["TOS_CREDENTIALS_PATH"] || "/etc/tos-credentials";
+/**
+ * Get TOS credentials from environment variable or file
+ * @param {string} key - the key of credentials
+ * @returns {string | undefined}
+ *  - returns value from environment variable if set.
+ *  - returns value from file if it is not empty.
+ *  - returns undefined when environment variable is not set AND
+ *      (credentials file does not exist (ENOENT) OR credentials file is empty).
+ * @throws {Error} when reading credentials file fails with non-ENOENT error.
+ */
+function getCredentials(key) {
+    if (process.env[`TOS_${key}`]) {
+        core.debug(`use TOS_${key} from environment variable.`);
+        return process.env[`TOS_${key}`];
+    }
+    const credentialsFile = (0, path_1.join)(credentialsPath, `TOS_${key}`);
+    try {
+        const value = (0, fs_1.readFileSync)(credentialsFile, "utf8").trim();
+        if (!value) {
+            core.warning(`a null value was read from the file: ${credentialsFile}`);
+            return undefined;
+        }
+        core.debug(`use TOS_${key} from file: ${credentialsFile}`);
+        return value;
+    }
+    catch (error) {
+        if (error.code === 'ENOENT') {
+            core.debug(`credentials file ${credentialsFile} not found`);
+            return undefined;
+        }
+        else {
+            core.error(`an error occurred when reading credentials file ${credentialsFile}`, error);
+            throw new Error(`Error loading credentials from file ${credentialsFile}: ${error.message}`);
+        }
+    }
+}
+exports.bucketName = getCredentials('BUCKET_NAME');
 exports.repoName = process.env['GITHUB_REPOSITORY'];
 exports.runId = process.env['GITHUB_RUN_ID'];
-exports.endpoint = process.env['ENDPOINT'];
-exports.region = process.env['REGION'];
-exports.accesskey = process.env['ACCESS_KEY'];
-exports.secretkey = process.env['SECRET_KEY'];
+exports.endpoint = getCredentials('ENDPOINT');
+exports.region = getCredentials('REGION');
+exports.accesskey = getCredentials('ACCESS_KEY');
+exports.secretkey = getCredentials('SECRET_KEY');
 exports.defaultObjectKeyPrefix = `artifacts/${exports.repoName}/${exports.runId}`;
 //# sourceMappingURL=constants.js.map
 
@@ -31843,7 +31906,7 @@ function downloadArtifactFromTOS(downloadPath, prefix, options) {
             artifacts = (yield artifactClient.listArtifacts()).artifacts;
         }
         if (artifacts.length === 0) {
-            throw new errors_1.ArtifactNotFoundError(`No artifacts found for name: ${options.artifactName}`);
+            throw new errors_1.ArtifactNotFoundError(`No artifacts found for name: ${options === null || options === void 0 ? void 0 : options.artifactName}`);
         }
         if (artifacts.length > 1) {
             core.warning('Multiple artifacts found, defaulting to first.');
